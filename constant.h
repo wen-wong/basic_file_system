@@ -1,0 +1,11 @@
+#define DISK_NAME "file_sys"
+
+#define SUPERBLOCK_SIZE 1
+#define INODE_TABLE_SIZE 10
+#define FREE_BITMAP_SIZE 2
+#define FILE_SIZE 10
+
+#define DATA_BLOCK_SIZE 1500
+#define DIR_BLOCK_SIZE 5
+#define DIR_ENTRY_SIZE 160
+#define DIR_PER_BLOCK 32
