@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "constant.h"
 #include "disk_emu.h"
@@ -116,8 +117,8 @@ int sfs_fclose(int fileID) {
     return close_fdt_entry((fdt_t *) &fd_table, fileID);
 }
 
-// TODO
 int sfs_fwrite(int fileID, const char *buf, int length) {
+    if (fileID < 0) return -1;
     block_t temp;
 
     /* Get File Descriptor Table information */
@@ -132,6 +133,7 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
     if (block_index < 0) {
         /* If the pointer does not have a block assigned */
         block_index = find_free_block();
+        ((inode_t *) &inode_table)[inode].pointers[pointer_index] = block_index;
     } else {
         /* If the pointer has a block */
         read_blocks(block_index, 1, &temp);
@@ -141,21 +143,21 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
     int buf_done = 0;
     int buf_left = length;
 
-    while (1) {
+    while (true) {
         int index;
-        for (index = 0; (index + starting_point < BLOCK_SIZE && index < buf_left - 1); index++) {
-            temp.data[starting_point + index] = buf[index];
+        for (index = 0; (index + starting_point < BLOCK_SIZE && index + buf_done < buf_left - 1); index++) {
+            temp.data[starting_point + index + buf_done] = buf[index];
         }
+
         write_blocks(block_index, 1, &temp);
 
-        buf_done = buf_left - (index + 1);
-        if (buf_done < 1) break;
+        buf_done = (index + 1);
         buf_left = buf_left - buf_done;
+
+        if (buf_left < 1) break;
+
         starting_point = 0;
-        printf("done: %d\n", buf_done);
-        printf("left: %d\n", buf_left);
-        // ! recount size if it overwrites existing data
-        ((inode_t *) &inode_table)[inode].size += buf_done;
+
 
         pointer_index++;
         int block_index = ((inode_t *) &inode_table)[inode].pointers[pointer_index];
@@ -169,11 +171,13 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
         }
     }
 
+    ((inode_t *) &inode_table)[inode].size = ((pointer_index + 1) * BLOCK_SIZE) - (BLOCK_SIZE - buf_done);
+
     write_blocks(SUPERBLOCK_SIZE, INODE_TABLE_SIZE, &inode_table);
 
     ((fdt_t *) &fd_table)[fileID].foffset += length;
 
-    return -1;
+    return 0;
 }
 
 // TODO

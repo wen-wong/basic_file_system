@@ -61,15 +61,18 @@ void remove_entry_inode(inode_t* inode_table) {
 }
 
 void remove_inode(inode_t* inode_table, int index) {
-    block_t temp_block[1];
+    block_t temp_block;
 
     inode_table[index].mode = 0;
     inode_table[index].link_cnt = 0;
     inode_table[index].size = 0;
 
+    printf("%d\n", inode_table[index].pointers[0]);
+
     for (int i = 0; i < INODE_POINTER_SIZE; i++) {
-        if (inode_table[index].pointers[i] < 0) return;
+        if (inode_table[index].pointers[i] < 0) break;
         int block_index = inode_table[index].pointers[i];
+        memcpy(&temp_block, "", BLOCK_SIZE);
         write_blocks(block_index, 1, &temp_block);
         inode_table[index].pointers[i] = -1;
     }
