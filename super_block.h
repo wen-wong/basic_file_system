@@ -16,6 +16,15 @@ typedef struct _superblock_t {
     int fbm_root_dir;
 } superblock_t;
 
+/**
+ * init_superblock -- Initializes the super block with default values
+ *                    and writes it to the disk.
+*/
 void init_superblock();
 
+/**
+ * check_valid_dish -- Verifies that the disk is of a valid format
+ *                     by checking the MAGIC value of it's superblock.
+ *                     If it is invalid, the whole program will be exited.
+*/
 void check_valid_disk();

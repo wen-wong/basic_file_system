@@ -8,7 +8,8 @@ LDFLAGS = `pkg-config fuse --cflags --libs`
 #SOURCES= disk_emu.c sfs_api.c sfs_inode.c sfs_dir.c sfs_test2.c sfs_api.h
 # SOURCES= disk_emu.c sfs_api.c sfs_inode.c sfs_dir.c fuse_wrap_old.c sfs_api.h
 #SOURCES= disk_emu.c sfs_api.c sfs_inode.c sfs_dir.c fuse_wrap_new.c sfs_api.h
-SOURCES = sfs_test0.c disk_emu.c sfs_api.c sfs_api.h super_block.c super_block.h inode.c inode.h free_bitmap.c free_bitmap.h directory.c directory.h fdt.c fdt.h constant.h
+# SOURCES = sfs_test0.c disk_emu.c sfs_api.c sfs_api.h super_block.c super_block.h inode.c inode.h free_bitmap.c free_bitmap.h directory.c directory.h fdt.c fdt.h constant.h
+SOURCES = sfs_test3.c disk_emu.c sfs_api.c sfs_api.h super_block.c super_block.h inode.c inode.h free_bitmap.c free_bitmap.h directory.c directory.h fdt.c fdt.h constant.h
 
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=sfs

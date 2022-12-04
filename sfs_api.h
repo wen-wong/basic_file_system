@@ -3,9 +3,9 @@
 
 void mksfs(int);
 
-// int sfs_getnextfilename(char*);
+int sfs_getnextfilename(char*);
 
-// int sfs_getfilesize(const char*);
+int sfs_getfilesize(const char*);
 
 int sfs_fopen(char*);
 

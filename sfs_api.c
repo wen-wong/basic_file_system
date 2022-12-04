@@ -12,22 +12,19 @@
 #include "directory.h"
 #include "fdt.h"
 
+/* In-Memory Data */
+block_t inode_table[INODE_TABLE_SIZE]; /* Inode Table */
+block_t dir_table[DIR_BLOCK_SIZE];     /* Directory Table */
+block_t fd_table[DIR_BLOCK_SIZE];      /* File Descriptor Table */
 
-block_t inode_table[INODE_TABLE_SIZE];
-block_t dir_table[DIR_BLOCK_SIZE];
-block_t fd_table[DIR_BLOCK_SIZE];
+int current_dir = 1;
 
-void set_dir_entry_table(inode_t inode, dirent_t* dir_table) {
-    block_t block[1];
-    for (int index = 0; index < DIR_BLOCK_SIZE; index++) {
-        if (inode.pointers[index] < 0) return;
-        read_blocks(inode.pointers[index], 1, &block);
-        for (int dir_index = 0; dir_index < DIR_PER_BLOCK; dir_index++)
-            dir_table[dir_index + index * DIR_PER_BLOCK] = ((dirent_t *) &block)[dir_index];
-    }
-}
+/* Helper Functions */
+void set_dir_entry_table(inode_t inode, dirent_t* dir_table);
+void create_file(char* name, inode_t* inode_table, int inode_index, dirent_t* dir_table, int dir_index);
 
 void mksfs(int fresh) {
+    current_dir = 1;
     if (fresh == 1) {
         /* To setup a new disk */
         /* Initialize a fresh disk */
@@ -57,30 +54,21 @@ void mksfs(int fresh) {
     init_fdt((fdt_t *) &fd_table);
 }
 
-void create_file(char* name, inode_t* inode_table, int inode_index, dirent_t* dir_table, int dir_index) {
-    int db_index = -1;
-    block_t block[1];
-
-    for (int index = 0; index < INODE_POINTER_SIZE + 1; index++) {
-        if (inode_table[0].pointers[index] > -1) {
-            db_index = inode_table[0].pointers[index];
-            read_blocks(inode_table[0].pointers[index], 1, &block);
-        } else {
-            db_index = find_free_block();
-            
-            inode_table[0].pointers[index] = db_index;
-        }
-
-        inode_table[0].size += sizeof(dirent_t);
-        write_blocks(SUPERBLOCK_SIZE, 1, inode_table);
-
-        int dir_blk_index = dir_index % (BLOCK_SIZE / sizeof(dirent_t));
-        strcpy(((dirent_t *) block)[dir_blk_index].filename, name);
-        ((dirent_t *) block)[dir_blk_index].inode = inode_index;
-
-        write_blocks(db_index, 1, &block);
-        break;
+int sfs_getnextfilename(char* fname) {
+    int dir_length = 1;
+    for (int i = 1; i < DIR_ENTRY_SIZE; i++) {
+        if (((dirent_t *) &dir_table)[i].inode < 0) break;
+        dir_length++;
     }
+    if (current_dir >= dir_length) return 0;
+    strcpy(fname, ((dirent_t *) &dir_table)[current_dir].filename);
+    current_dir++;
+    return 1;
+}
+
+int sfs_getfilesize(const char* path) {
+    int inode = find_inode_with_path(path, (dirent_t *) dir_table);
+    return ((inode_t *) &inode_table)[inode].size;
 }
 
 int sfs_fopen(char *name) {
@@ -177,10 +165,9 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
 
     ((fdt_t *) &fd_table)[fileID].foffset += length;
 
-    return 0;
+    return length;
 }
 
-// TODO
 int sfs_fread(int fileID, char *buf, int length) {
     block_t temp[1];
 
@@ -194,18 +181,17 @@ int sfs_fread(int fileID, char *buf, int length) {
     } else {
         read_blocks(block_index, 1, &temp);
     }
-    memcpy(buf, &temp, length);
+    memcpy(buf, &temp + ((size % BLOCK_SIZE)), length);
 
     ((fdt_t *) &fd_table)[fileID].foffset += length;
 
-    return -1;
+    return length;
 }
 
 int sfs_fseek(int fileID, int loc) {
     return seek_fdt_entry((fdt_t *) &fd_table, fileID, loc);
 }
 
-// ! REDO
 int sfs_remove(char *file) {
     int inode_index = find_inode_with_filename(file, (dirent_t *) &dir_table);
     int dir_index = remove_dir_entry_mem((dirent_t *) &dir_table, file);
@@ -213,10 +199,46 @@ int sfs_remove(char *file) {
 
     int dir_block_index = ((inode_t *) &inode_table)[0].pointers[dir_index / DIR_PER_BLOCK];
 
-    remove_dir_entry_disk((dirent_t *) &dir_table, dir_block_index, dir_index);
+    remove_dir_entry_disk(dir_block_index, dir_index);
     remove_entry_inode((inode_t *) &inode_table);
 
     remove_inode((inode_t *) &inode_table, inode_index);
 
     return 0;
+}
+
+void set_dir_entry_table(inode_t inode, dirent_t* dir_table) {
+    block_t block[1];
+    for (int index = 0; index < DIR_BLOCK_SIZE; index++) {
+        if (inode.pointers[index] < 0) return;
+        read_blocks(inode.pointers[index], 1, &block);
+        for (int dir_index = 0; dir_index < DIR_PER_BLOCK; dir_index++)
+            dir_table[dir_index + index * DIR_PER_BLOCK] = ((dirent_t *) &block)[dir_index];
+    }
+}
+
+void create_file(char* name, inode_t* inode_table, int inode_index, dirent_t* dir_table, int dir_index) {
+    int disk_block_index = -1;
+    block_t block;
+
+    for (int index = 0; index < INODE_POINTER_SIZE + 1; index++) {
+        if (inode_table[0].pointers[index] > -1) {
+            disk_block_index = inode_table[0].pointers[index];
+            read_blocks(inode_table[0].pointers[index], 1, &block);
+        } else {
+            disk_block_index = find_free_block();
+            
+            inode_table[0].pointers[index] = disk_block_index;
+        }
+
+        inode_table[0].size += sizeof(dirent_t);
+        write_blocks(SUPERBLOCK_SIZE, 1, inode_table);
+
+        int dir_blk_index = dir_index % (BLOCK_SIZE / sizeof(dirent_t));
+        strcpy(((dirent_t *) &block)[dir_blk_index].filename, name);
+        ((dirent_t *) &block)[dir_blk_index].inode = inode_index;
+
+        write_blocks(disk_block_index, 1, &block);
+        break;
+    }
 }

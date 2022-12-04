@@ -3,9 +3,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * init_superblock -- Initializes the super block with default values
+ *                    and writes it to the disk.
+*/
 void init_superblock() {
-    block_t block[SUPERBLOCK_SIZE];
-    superblock_t *super_block = (superblock_t *) block;
+    block_t block;
+    superblock_t *super_block = (superblock_t *) &block;
     
     strcpy(super_block -> magic, MAGIC);
     super_block -> block_size = BLOCK_SIZE;
@@ -20,12 +24,16 @@ void init_superblock() {
     write_blocks(0, SUPERBLOCK_SIZE, &block);
 }
 
+/**
+ * check_valid_dish -- Verifies that the disk is of a valid format
+ *                     by checking the MAGIC value of it's superblock.
+ *                     If it is invalid, the whole program will be exited.
+*/
 void check_valid_disk() {
-    block_t block[SUPERBLOCK_SIZE];
-    read_blocks(0, SUPERBLOCK_SIZE, block);
+    block_t block;
+    read_blocks(0, SUPERBLOCK_SIZE, &block);
 
-    superblock_t *super_block = (superblock_t *) block;
-    if (strcmp(super_block -> magic, MAGIC) != 0) {
+    if (strcmp(((superblock_t *) &block) -> magic, MAGIC) != 0) {
         printf("Invalid File Format -- Cannot Open the file system.\n");
         exit(EXIT_FAILURE);
     }
