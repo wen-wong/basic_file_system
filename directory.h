@@ -65,3 +65,11 @@ void insert_dir_entry(dirent_t* dir_table, int index, char *name, int inode);
  * returns directory entry index
 */
 int remove_dir_entry_mem(dirent_t* dir_table, char *name);
+
+/**
+ * remove_dir_entry_disk -- Removes the directory entry on the disk.
+ * 
+ * dir_block_index: block index of the directory entry
+ * dir_index: index of the directory entry
+*/
+void remove_dir_entry_disk(int dir_block_index, int dir_index);

@@ -90,3 +90,20 @@ int remove_dir_entry_mem(dirent_t* dir_table, char *name) {
     }
     return -1;
 }
+
+/**
+ * remove_dir_entry_disk -- Removes the directory entry on the disk.
+ * 
+ * dir_block_index: block index of the directory entry
+ * dir_index: index of the directory entry
+*/
+void remove_dir_entry_disk(int dir_block_index, int dir_index) {
+    block_t block;
+    read_blocks(dir_block_index, 1, &block);
+
+    dirent_t *dir = (dirent_t *) &block;
+    memset(dir[dir_index % DIR_PER_BLOCK].filename, 0, DIR_PER_BLOCK - sizeof(int));
+    dir[dir_index % DIR_PER_BLOCK].inode = -1;
+    
+    write_blocks(dir_block_index, 1, &block);
+}

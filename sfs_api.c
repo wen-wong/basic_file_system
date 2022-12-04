@@ -1,3 +1,10 @@
+/**
+ * README: Simple File System API
+ * ------------------------------
+ * The following implementation provides a set of functions to create, write, read and remove files
+ * into a disk. The API has multiple files.
+ * 
+*/
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -22,7 +29,8 @@ int current_dir = 1;
 /* Helper Functions */
 void set_dir_entry_table(inode_t inode, dirent_t* dir_table);
 void create_file(char* name, inode_t* inode_table, int inode_index, dirent_t* dir_table, int dir_index);
-void remove_dir_entry_disk(int dir_block_index, int dir_index);
+void remove_inode(inode_t* inode_table, int index);
+
 void mksfs(int fresh) {
     current_dir = 1;
     if (fresh == 1) {
@@ -279,18 +287,44 @@ void create_file(char* name, inode_t* inode_table, int inode_index, dirent_t* di
 }
 
 /**
- * remove_dir_entry_disk -- Removes the directory entry on the disk.
+ * remove_inode -- Removes all data to the requested INode In-Memory and on the disk.
  * 
- * dir_block_index: block index of the directory entry
- * dir_index: index of the directory entry
+ * inode_table: INode table in memory
+ * index: Index of the INode to be reset
 */
-void remove_dir_entry_disk(int dir_block_index, int dir_index) {
-    block_t block;
-    read_blocks(dir_block_index, 1, &block);
+void remove_inode(inode_t* inode_table, int index) {
+    block_t temp_block;
 
-    dirent_t *dir = (dirent_t *) &block;
-    memset(dir[dir_index % DIR_PER_BLOCK].filename, 0, DIR_PER_BLOCK - sizeof(int));
-    dir[dir_index % DIR_PER_BLOCK].inode = -1;
-    
-    write_blocks(dir_block_index, 1, &block);
+    inode_table[index].mode = 0;
+    inode_table[index].link_cnt = 0;
+    inode_table[index].size = 0;
+
+    /* Clear all data in each pointer */
+    for (int i = 0; i < INODE_POINTER_SIZE; i++) {
+        if (inode_table[index].pointers[i] < 0) break;
+
+        int block_index = inode_table[index].pointers[i];
+        memset(&temp_block, 0, BLOCK_SIZE);
+        write_blocks(block_index, 1, &temp_block);
+        reset_free_block(block_index);
+        inode_table[index].pointers[i] = -1;
+    }
+
+    /* Clear all data in the indirect pointer */
+    if (inode_table[index].ind_pointer != -1) {
+
+        block_t ind_block, ind_inner_block;
+        read_blocks(inode_table[index].ind_pointer, 1, &ind_block);
+        memset(&ind_inner_block, 0, BLOCK_SIZE);
+        for (int i = 0; i < BLOCK_SIZE / sizeof(int); i++) {
+            int block_id = ((int *) &ind_block)[i];
+            if (block_id < 0) break;
+            write_blocks(block_id, 1, &ind_inner_block);
+            reset_free_block(block_id);
+        }
+        reset_free_block(inode_table[index].ind_pointer);
+        inode_table[index].ind_pointer = -1;
+    }
+
+    write_blocks(SUPERBLOCK_SIZE, INODE_TABLE_SIZE, inode_table);
 }

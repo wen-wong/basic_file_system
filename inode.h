@@ -65,11 +65,3 @@ void init_inode(inode_t* inode_table, int index);
  * inode_table: INode table in memory
 */
 void remove_entry_inode(inode_t* inode_table);
-
-/**
- * remove_inode -- Removes all data to the requested INode In-Memory and on the disk.
- * 
- * inode_table: INode table in memory
- * index: Index of the INode to be reset
-*/
-void remove_inode(inode_t* inode_table, int index);
