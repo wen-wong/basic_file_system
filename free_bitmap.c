@@ -11,11 +11,13 @@ void init_fbm() {
     for (int i = SUPERBLOCK_SIZE + INODE_TABLE_SIZE; i < SUPERBLOCK_SIZE + INODE_TABLE_SIZE + DATA_BLOCK_SIZE; i++)
         free_bitmap[i] = 1;
     
-    write_blocks(SUPERBLOCK_SIZE + INODE_TABLE_SIZE + DATA_BLOCK_SIZE + DIR_BLOCK_SIZE, FREE_BITMAP_SIZE, free_bitmap);
+    write_blocks(SUPERBLOCK_SIZE + INODE_TABLE_SIZE + DATA_BLOCK_SIZE + DIR_BLOCK_SIZE, FREE_BITMAP_SIZE, &free_bitmap);
 }
 
 /**
  * find_free_block -- Finds the first available block that can be used, and sets it to used.
+ * 
+ * returns the index of the data block
 */
 int find_free_block() {
     int index = -1;
@@ -23,13 +25,26 @@ int find_free_block() {
     read_blocks(SUPERBLOCK_SIZE + INODE_TABLE_SIZE + DATA_BLOCK_SIZE + DIR_BLOCK_SIZE, FREE_BITMAP_SIZE, &block);
 
     for (int i = SUPERBLOCK_SIZE + INODE_TABLE_SIZE; i < SUPERBLOCK_SIZE + INODE_TABLE_SIZE + DATA_BLOCK_SIZE; i++) {
-        if (((uint8_t *) block)[i] == 1) {
+        if (((uint8_t *) &block)[i] == 1) {
             /* Set the bit to 0 since the block at i will be used */
-            ((uint8_t *) block)[i] = 0;
+            ((uint8_t *) &block)[i] = 0;
             index = i;
             break;
         }
     }
-    write_blocks(SUPERBLOCK_SIZE + INODE_TABLE_SIZE + DATA_BLOCK_SIZE + DIR_BLOCK_SIZE, FREE_BITMAP_SIZE, block);
+    write_blocks(SUPERBLOCK_SIZE + INODE_TABLE_SIZE + DATA_BLOCK_SIZE + DIR_BLOCK_SIZE, FREE_BITMAP_SIZE, &block);
     return index;
+}
+
+/**
+ * reset_free_block -- Resets the requested block to a free available block.
+ * 
+ * index: index of the data block
+*/
+void reset_free_block(int index) {
+    block_t block[FREE_BITMAP_SIZE];
+    read_blocks(SUPERBLOCK_SIZE + INODE_TABLE_SIZE + DATA_BLOCK_SIZE + DIR_BLOCK_SIZE, FREE_BITMAP_SIZE, &block);
+    ((uint8_t *) &block)[index] = 1;
+
+    write_blocks(SUPERBLOCK_SIZE + INODE_TABLE_SIZE + DATA_BLOCK_SIZE + DIR_BLOCK_SIZE, FREE_BITMAP_SIZE, &block);
 }

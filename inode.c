@@ -117,22 +117,26 @@ void remove_inode(inode_t* inode_table, int index) {
     /* Clear all data in each pointer */
     for (int i = 0; i < INODE_POINTER_SIZE; i++) {
         if (inode_table[index].pointers[i] < 0) break;
+
         int block_index = inode_table[index].pointers[i];
-        memcpy(&temp_block, "", BLOCK_SIZE);
+        memset(&temp_block, 0, BLOCK_SIZE);
         write_blocks(block_index, 1, &temp_block);
+
         inode_table[index].pointers[i] = -1;
     }
 
     /* Clear all data in the indirect pointer */
     if (inode_table[index].ind_pointer != -1) {
+
         block_t ind_block, ind_inner_block;
         read_blocks(inode_table[index].ind_pointer, 1, &ind_block);
-        memcpy(&ind_inner_block, "", BLOCK_SIZE);
+        memset(&ind_inner_block, 0, BLOCK_SIZE);
         for (int i = 0; i < BLOCK_SIZE / sizeof(int); i++) {
             int block_id = ((int *) &ind_block)[i];
             if (block_id < 0) break;
             read_blocks(block_id, 1, &ind_inner_block);
         }
+        
         inode_table[index].ind_pointer = -1;
     }
 

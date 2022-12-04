@@ -22,7 +22,7 @@ int current_dir = 1;
 /* Helper Functions */
 void set_dir_entry_table(inode_t inode, dirent_t* dir_table);
 void create_file(char* name, inode_t* inode_table, int inode_index, dirent_t* dir_table, int dir_index);
-
+void remove_dir_entry_disk(int dir_block_index, int dir_index);
 void mksfs(int fresh) {
     current_dir = 1;
     if (fresh == 1) {
@@ -113,6 +113,8 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
     int inode = ((fdt_t *) &fd_table)[fileID].inum;
     int size = ((fdt_t *) &fd_table)[fileID].foffset;
 
+    if (inode < 0) return -1;
+
     /* Check which inode pointer to find the starting block */
     int pointer_index = size / BLOCK_SIZE;
     /* Get the starting block to write */
@@ -127,40 +129,37 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
         read_blocks(block_index, 1, &temp);
     }
 
-    int starting_point = size - (pointer_index * BLOCK_SIZE);
-    int buf_done = 0;
-    int buf_left = length;
+    int current_length = length;
 
     while (true) {
-        int index;
-        for (index = 0; (index + starting_point < BLOCK_SIZE && index + buf_done < buf_left - 1); index++) {
-            temp.data[starting_point + index + buf_done] = buf[index];
-        }
+        if (length > BLOCK_SIZE - size) {
+            current_length -= BLOCK_SIZE - size;
 
-        write_blocks(block_index, 1, &temp);
+            strcpy(((char *) &temp) + size, buf);
+            write_blocks(block_index, 1, &temp);
 
-        buf_done = (index + 1);
-        buf_left = buf_left - buf_done;
+            if (current_length <= 0) break;
+            size = 0;
 
-        if (buf_left < 1) break;
+            pointer_index++;
+            int block_index = ((inode_t *) &inode_table)[inode].pointers[pointer_index];
 
-        starting_point = 0;
-
-
-        pointer_index++;
-        int block_index = ((inode_t *) &inode_table)[inode].pointers[pointer_index];
-
-        if (block_index < 0) {
-            /* If the pointer does not have a block assigned */
-            block_index = find_free_block();
+            if (block_index < 0) {
+                /* If the pointer does not have a block assigned */
+                block_index = find_free_block();
+                ((inode_t *) &inode_table)[inode].pointers[pointer_index] = block_index;
+            } else {
+                /* If the pointer has a block */
+                read_blocks(block_index, 1, &temp);
+            }
         } else {
-            /* If the pointer has a block */
-            read_blocks(block_index, 1, &temp);
+            strcpy(((char *) &temp) + size, buf);
+            write_blocks(block_index, 1, &temp);
+            break;
         }
     }
 
-    ((inode_t *) &inode_table)[inode].size = ((pointer_index + 1) * BLOCK_SIZE) - (BLOCK_SIZE - buf_done);
-
+    ((inode_t *) &inode_table)[inode].size = size + length;
     write_blocks(SUPERBLOCK_SIZE, INODE_TABLE_SIZE, &inode_table);
 
     ((fdt_t *) &fd_table)[fileID].foffset += length;
@@ -169,19 +168,53 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
 }
 
 int sfs_fread(int fileID, char *buf, int length) {
-    block_t temp[1];
+    if (fileID < 0) return -1;
+    block_t temp;
 
+    /* Get File Descriptor Table information */
     int inode = ((fdt_t *) &fd_table)[fileID].inum;
     int size = ((fdt_t *) &fd_table)[fileID].foffset;
 
+    if (inode < 0) return -1;
+
+    /* Check which inode pointer to find the starting block */
     int pointer_index = size / BLOCK_SIZE;
+    /* Get the starting block to write */
     int block_index = ((inode_t *) &inode_table)[inode].pointers[pointer_index];
+
     if (block_index < 0) {
-        block_index = find_free_block();
+        return -1;
     } else {
+        /* If the pointer has a block */
         read_blocks(block_index, 1, &temp);
     }
-    memcpy(buf, &temp + ((size % BLOCK_SIZE)), length);
+
+    int current_length = length;
+
+    while (true) {
+        if (length > BLOCK_SIZE - size) {
+            current_length -= BLOCK_SIZE - size;
+
+            strcpy(buf, ((char *) &temp) + size);
+
+            if (current_length <= 0) break;
+            size = 0;
+
+            pointer_index++;
+            int block_index = ((inode_t *) &inode_table)[inode].pointers[pointer_index];
+
+            if (block_index < 0) {
+                return -1;
+            } else {
+                /* If the pointer has a block */
+                read_blocks(block_index, 1, &temp);
+            }
+        } else {
+            strcpy(buf, ((char *) &temp) + size);
+            break;
+        }
+    }
+    ((inode_t *) &inode_table)[inode].size = length;
 
     ((fdt_t *) &fd_table)[fileID].foffset += length;
 
@@ -193,7 +226,9 @@ int sfs_fseek(int fileID, int loc) {
 }
 
 int sfs_remove(char *file) {
+    /* Get INode of the file from the directory table in memory */
     int inode_index = find_inode_with_filename(file, (dirent_t *) &dir_table);
+    /* Get directory entry index of the file from the directory table in memory */
     int dir_index = remove_dir_entry_mem((dirent_t *) &dir_table, file);
     if (dir_index < 0) return -1;
 
@@ -241,4 +276,21 @@ void create_file(char* name, inode_t* inode_table, int inode_index, dirent_t* di
         write_blocks(disk_block_index, 1, &block);
         break;
     }
+}
+
+/**
+ * remove_dir_entry_disk -- Removes the directory entry on the disk.
+ * 
+ * dir_block_index: block index of the directory entry
+ * dir_index: index of the directory entry
+*/
+void remove_dir_entry_disk(int dir_block_index, int dir_index) {
+    block_t block;
+    read_blocks(dir_block_index, 1, &block);
+
+    dirent_t *dir = (dirent_t *) &block;
+    memset(dir[dir_index % DIR_PER_BLOCK].filename, 0, DIR_PER_BLOCK - sizeof(int));
+    dir[dir_index % DIR_PER_BLOCK].inode = -1;
+    
+    write_blocks(dir_block_index, 1, &block);
 }

@@ -12,5 +12,14 @@ void init_fbm();
 
 /**
  * find_free_block -- Finds the first available block that can be used, and sets it to used.
+ * 
+ * returns the index of the data block
 */
 int find_free_block();
+
+/**
+ * reset_free_block -- Resets the requested block to a free available block.
+ * 
+ * index: index of the data block
+*/
+void reset_free_block(int index);

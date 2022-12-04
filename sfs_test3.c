@@ -77,7 +77,6 @@ int main() {
     sfs_fwrite(f, my_data, sizeof(my_data)+1);
     sfs_fseek(f, 16);
     sfs_fread(f, out_data, sizeof(out_data)+1);
-    printf("WHY\n");
     if (strcmp(out_data,"fox jumps over the lazy dog") != 0) {
         red();
         printf("ERROR: sfs_fseek and sfs_fread failed. Expected 'fox jumps over the lazy dog' but got '%s'\n",out_data);
