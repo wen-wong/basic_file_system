@@ -34,7 +34,7 @@ void check_valid_disk() {
     read_blocks(0, SUPERBLOCK_SIZE, &block);
 
     if (strcmp(((superblock_t *) &block) -> magic, MAGIC) != 0) {
-        printf("Invalid File Format -- Cannot Open the file system.\n");
+        printf("Invalid File Format -- Cannot open the file system.\n");
         exit(EXIT_FAILURE);
     }
 }
