@@ -1,4 +1,4 @@
-# Assignment 3 - Simple File System
+# Simple File System
 
 The following documentation covers
 - The File System structure
